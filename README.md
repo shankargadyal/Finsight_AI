@@ -1,4 +1,7 @@
-# 📈 FinSight AI
+# 📈 FinSight AI -  Intelligent Stock Market Prediction & Financial Analysis
+
+
+
 
 **Intelligent Stock Market Prediction & Financial Analysis Platform**
 
@@ -82,14 +85,11 @@ finsight-ai/
 │   └── user_auth.py
 ├── static/
 │   ├── css/
-│   ├── js/
-│   └── assets/
+│   └── js/
+|
 ├── templates/
 │   ├── index.html
-│   ├── dashboard.html
-│   ├── login.html
-│   ├── register.html
-│   └── assistant.html
+│   └── future.html
 └── database/
     └── users.db
 ```
@@ -100,9 +100,9 @@ finsight-ai/
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.10+
 - pip
-- An [Anthropic API key](https://console.anthropic.com/) (for the AI assistant)
+- An [Anthropic API key]((https://aistudio.google.com/)) (for the AI assistant)
 - A [News API key](https://newsapi.org/) (for the news summarizer)
 
 ### Installation
@@ -128,7 +128,7 @@ export NEWS_API_KEY=your_key_here
 python app.py
 ```
 
-Then open `http://localhost:5000` in your browser.
+Then open `http://localhost:60000` in your browser.
 
 ---
 
@@ -142,7 +142,7 @@ keras
 yfinance
 vaderSentiment
 newsapi-python
-anthropic
+Gemini
 bcrypt
 pandas
 numpy
@@ -172,7 +172,7 @@ Yahoo Finance API
       ↓
  Risk Analyzer + News Sentiment NLP
       ↓
- AI Assistant (Anthropic API)
+ AI Assistant (Gemini API)
       ↓
  Interactive Dashboard
 ```
