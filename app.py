@@ -14,6 +14,7 @@
 #    python app.py
 # =============================================================================
 
+
 import os, traceback
 from datetime import datetime, timedelta
 
@@ -40,7 +41,9 @@ load_dotenv()
 # ── App ───────────────────────────────────────────────────────────────────────
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.secret_key = os.getenv("SECRET_KEY", os.urandom(32))
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+_ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+CORS(app, resources={r"/api/*": {"origins": _ALLOWED_ORIGINS or "*"}},
+     supports_credentials=bool(_ALLOWED_ORIGINS))
 
 # ── Init DB + auth routes ──────────────────────────────────────────────────────
 init_db()
@@ -112,6 +115,7 @@ def stock(ticker: str):
         df = fetch_ohlcv(symbol, period)
         if df.empty:
             return jsonify({"error": f"No data found for '{symbol}'."}), 404
+        is_simulated = bool(df.attrs.get("simulated", False))
         df   = add_technical_indicators(df)
         rows = [serialise_row(row) for _, row in df.iterrows()]
         last = df.iloc[-1]; prev = df.iloc[-2] if len(df) >= 2 else last
@@ -121,6 +125,9 @@ def stock(ticker: str):
             "symbol": symbol, "period": period,
             "info":   get_company_info(symbol),
             "data":   rows,
+            "data_source": "simulated" if is_simulated else "live",
+            "warning": ("Live market data was unavailable, so these figures are "
+                        "a simulated approximation, not real prices.") if is_simulated else None,
             "summary": {
                 "current_price": safe_float(last["Close"]),
                 "change":        round(chg, 2),
@@ -136,7 +143,7 @@ def stock(ticker: str):
         })
     except Exception as exc:
         traceback.print_exc()
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Something went wrong processing this request."}), 500
 
 
 # =============================================================================
@@ -154,7 +161,7 @@ def risk_endpoint(ticker: str):
         return jsonify({"symbol": symbol, **risk})
     except Exception as exc:
         traceback.print_exc()
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Something went wrong processing this request."}), 500
 
 
 # =============================================================================
@@ -171,6 +178,7 @@ def analyze(ticker: str):
         df = fetch_ohlcv(symbol, period="2y")
         if df.empty or len(df) < 80:
             return jsonify({"error": f"Not enough data for '{symbol}'."}), 404
+        is_simulated = bool(df.attrs.get("simulated", False))
         df = add_technical_indicators(df)
         prices     = df["Close"].tolist()
         last_date  = df["Date"].iloc[-1].strftime("%Y-%m-%d")
@@ -237,6 +245,9 @@ def analyze(ticker: str):
             "change":     round(last_close - prev_close, 2),
             "change_pct": round((last_close - prev_close) / prev_close * 100, 2) if prev_close else 0,
             "info":       get_company_info(symbol),
+            "data_source": "simulated" if is_simulated else "live",
+            "warning": ("Live market data was unavailable, so this analysis is based on "
+                        "a simulated approximation, not real prices.") if is_simulated else None,
             "historical": hist,
             "future_dates": fut_dates,
             "linear_reg": result["linear_reg"],
@@ -265,7 +276,7 @@ def analyze(ticker: str):
         })
     except Exception as exc:
         traceback.print_exc()
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Something went wrong processing this request."}), 500
 
 
 # =============================================================================
@@ -372,15 +383,17 @@ def not_found(_):
 
 @app.errorhandler(500)
 def server_error(e):
-    return jsonify({"error": "Internal server error", "detail": str(e)}), 500
+    traceback.print_exc()
+    return jsonify({"error": "Internal server error"}), 500
 
 
 # =============================================================================
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 60000))
+    port = int(os.getenv("PORT", 5001))
     print(f"\n{'='*52}")
     print(f"  FinSight AI v2 — Production Backend")
     print(f"  http://localhost:{port}")
     print(f"  Future Scope: http://localhost:{port}/future")
     print(f"{'='*52}\n")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
