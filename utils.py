@@ -68,11 +68,14 @@ def fetch_ohlcv(symbol: str, period: str = "2y") -> pd.DataFrame:
             df   = df[keep].dropna(subset=["Close"])
             if len(df) > 20:
                 print(f"[utils] ✅ yfinance: {symbol} {len(df)} rows")
+                df.attrs["simulated"] = False
                 return df
     except Exception as e:
         print(f"[utils] yfinance error ({e.__class__.__name__}), using simulation")
 
-    return simulate_ohlcv(symbol, period)
+    sim = simulate_ohlcv(symbol, period)
+    sim.attrs["simulated"] = True
+    return sim
 
 
 def simulate_ohlcv(symbol: str, period: str = "2y") -> pd.DataFrame:
