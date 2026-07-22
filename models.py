@@ -127,6 +127,7 @@ class ARIMAModel:
             ci     = fc.conf_int(alpha=0.20)   # 80% confidence interval
 
             preds  = np.clip(preds, prices[-1]*0.5, prices[-1]*2.0)
+            ci     = np.asarray(ci)   # fc.conf_int() may return ndarray or DataFrame
 
             # In-sample AIC
             aic = round(float(fitted.aic), 2)
@@ -135,8 +136,8 @@ class ARIMAModel:
             return {
                 "predictions": [round(float(p),2) for p in preds],
                 "aic":         aic,
-                "conf_int_lower": [round(float(v),2) for v in ci.iloc[:,0]],
-                "conf_int_upper": [round(float(v),2) for v in ci.iloc[:,1]],
+                "conf_int_lower": [round(float(v),2) for v in ci[:,0]],
+                "conf_int_upper": [round(float(v),2) for v in ci[:,1]],
                 "model":       "ARIMA (5,1,0)",
                 "error":       None,
             }
