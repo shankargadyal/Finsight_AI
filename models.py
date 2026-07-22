@@ -1,359 +1,247 @@
-# =============================================================================
-#  models.py  —  FinSight AI · All Three ML Models + Ensemble
-# =============================================================================
-#
-#  Classes:
-#    LinearRegressionModel  — sklearn poly regression, fastest
-#    ARIMAModel             — statsmodels ARIMA(5,1,0), statistical
-#    LSTMModel              — TensorFlow/Keras deep learning, most accurate
-#    EnsembleModel          — weighted average (LSTM 50 · ARIMA 30 · LR 20)
-#
-#  Each model exposes:
-#    .predict(close_prices, future_days=7) → dict
-#
-#  Run standalone:
-#    python models.py
-# =============================================================================
+"""
+models.py - Production ML pipeline for FinSight AI
 
-import os, warnings
-warnings.filterwarnings("ignore")
+CRITICAL RULE: model.fit() for the LSTM is NEVER called from this file.
+LSTMModel.predict() only loads a pretrained artifact and runs inference.
+To (re)train the LSTM, run train_model.py offline (outside the Flask request path).
 
-import numpy  as np
-import pandas as pd
+Linear Regression and ARIMA are still fit per-request because they are cheap,
+closed-form / classical-statistics fits (milliseconds, not a training loop) and
+carry negligible memory overhead compared to a neural network.
+"""
+import os
+import json
+import logging
 
-from sklearn.linear_model   import LinearRegression
-from sklearn.preprocessing  import MinMaxScaler, PolynomialFeatures
-from sklearn.metrics        import mean_squared_error, mean_absolute_error
+import numpy as np
 
-from statsmodels.tsa.arima.model import ARIMA
+logger = logging.getLogger("finsight.models")
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-import tensorflow as tf
-tf.get_logger().setLevel("ERROR")
-from tensorflow.keras.models    import Sequential
-from tensorflow.keras.layers    import LSTM, Dense, Dropout, Input
-from tensorflow.keras.callbacks import EarlyStopping
+SAVED_MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "saved_models")
 
 
-# =============================================================================
-#  MODEL 1 — LINEAR REGRESSION
-# =============================================================================
-class LinearRegressionModel:
-    """
-    Polynomial degree-2 regression on:
-      • Day index (t)
-      • 7-day moving average
-      • 14-day moving average
-      • 21-day moving average
+class ModelUnavailableError(Exception):
+    """Raised whenever a single model cannot produce a prediction.
+    Caught by EnsembleModel so one failure never takes down the whole request."""
+    pass
 
-    Returns: predictions, RMSE, MAE
-    """
 
-    def predict(self, close_prices: list, future_days: int = 7) -> dict:
+# ─────────────────────────────────────────────────────────────────────────
+# Linear Regression
+# ─────────────────────────────────────────────────────────────────────────
+class LinearRegModel:
+    def __init__(self, symbol):
+        self.symbol = symbol
+
+    def predict(self, close_prices, future_days=7):
         try:
-            prices = np.array(close_prices, dtype=float)
-            n      = len(prices)
-            ser    = pd.Series(prices)
+            from sklearn.linear_model import LinearRegression
+            from sklearn.metrics import mean_squared_error
 
-            def ma(w): return ser.rolling(w, min_periods=1).mean().values
+            prices = np.asarray(close_prices, dtype=float)
+            if len(prices) < 10:
+                raise ModelUnavailableError("Not enough data points for linear regression")
 
-            # Feature matrix
-            X = np.column_stack([np.arange(n), ma(7), ma(14), ma(21)])
+            X = np.arange(len(prices)).reshape(-1, 1)
             y = prices
 
-            # Normalise
-            scX = MinMaxScaler(); scY = MinMaxScaler()
-            Xs  = scX.fit_transform(X)
-            ys  = scY.fit_transform(y.reshape(-1,1)).ravel()
+            model = LinearRegression()
+            model.fit(X, y)
 
-            # Polynomial expansion
-            poly = PolynomialFeatures(degree=2, include_bias=False)
-            Xp   = poly.fit_transform(Xs)
+            in_sample = model.predict(X)
+            rmse = float(np.sqrt(mean_squared_error(y, in_sample)))
 
-            # Fit
-            mdl = LinearRegression().fit(Xp, ys)
+            future_X = np.arange(len(prices), len(prices) + future_days).reshape(-1, 1)
+            future_preds = model.predict(future_X)
 
-            # In-sample RMSE / MAE (last 30 days)
-            preds_in = scY.inverse_transform(mdl.predict(Xp).reshape(-1,1)).ravel()
-            rmse = float(np.sqrt(mean_squared_error(prices[-30:], preds_in[-30:])))
-            mae  = float(mean_absolute_error(prices[-30:], preds_in[-30:]))
-
-            # Forecast
-            last_mas = [float(ma(w)[-1]) for w in (7, 14, 21)]
-            futX  = np.array([[n + i, *last_mas] for i in range(1, future_days+1)])
-            futPs = scY.inverse_transform(
-                mdl.predict(poly.transform(scX.transform(futX))).reshape(-1,1)
-            ).ravel()
-            futPs = np.clip(futPs, prices[-1]*0.5, prices[-1]*2.0)
-
-            print(f"   [LinearReg]  Day-7 → ${futPs[-1]:.2f}  RMSE={rmse:.4f}")
             return {
-                "predictions": [round(float(p),2) for p in futPs],
-                "rmse":        round(rmse, 4),
-                "mae":         round(mae, 4),
-                "model":       "Linear Regression",
-                "error":       None,
+                "predictions": future_preds.tolist(),
+                "rmse": round(rmse, 4),
             }
+        except ModelUnavailableError:
+            raise
         except Exception as e:
-            print(f"   [LinearReg]  ERROR: {e}")
-            return {"predictions":[], "rmse":None, "mae":None,
-                    "model":"Linear Regression", "error":str(e)}
+            logger.warning("[%s] LinearRegModel failed: %s", self.symbol, e)
+            raise ModelUnavailableError(str(e))
 
 
-# =============================================================================
-#  MODEL 2 — ARIMA
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────
+# ARIMA
+# ─────────────────────────────────────────────────────────────────────────
 class ARIMAModel:
-    """
-    ARIMA(5,1,0):
-      p=5  auto-regression on last 5 differences
-      d=1  first-order differencing for stationarity
-      q=0  no MA term (stable, fast)
+    def __init__(self, symbol):
+        self.symbol = symbol
 
-    Uses last 200 trading days for speed.
-    Returns: predictions, AIC, confidence_intervals
-    """
-
-    MAX_HISTORY = 200
-
-    def predict(self, close_prices: list, future_days: int = 7) -> dict:
+    def predict(self, close_prices, future_days=7):
         try:
-            prices = np.array(close_prices[-self.MAX_HISTORY:], dtype=float)
+            from statsmodels.tsa.arima.model import ARIMA
 
-            mdl    = ARIMA(prices, order=(5, 1, 0))
-            fitted = mdl.fit()
-            fc     = fitted.get_forecast(steps=future_days)
-            preds  = fc.predicted_mean
-            ci     = fc.conf_int(alpha=0.20)   # 80% confidence interval
+            prices = np.asarray(close_prices, dtype=float)
+            if len(prices) < 30:
+                raise ModelUnavailableError("Not enough data points for ARIMA")
 
-            preds  = np.clip(preds, prices[-1]*0.5, prices[-1]*2.0)
-            ci     = np.asarray(ci)   # fc.conf_int() may return ndarray or DataFrame
+            model = ARIMA(prices, order=(5, 1, 0))
+            fitted = model.fit()
 
-            # In-sample AIC
-            aic = round(float(fitted.aic), 2)
+            forecast = fitted.get_forecast(steps=future_days)
+            mean_fc = np.asarray(forecast.predicted_mean)
+            conf_int = np.asarray(forecast.conf_int(alpha=0.05))
 
-            print(f"   [ARIMA]      Day-7 → ${preds[-1]:.2f}  AIC={aic}")
             return {
-                "predictions": [round(float(p),2) for p in preds],
-                "aic":         aic,
-                "conf_int_lower": [round(float(v),2) for v in ci[:,0]],
-                "conf_int_upper": [round(float(v),2) for v in ci[:,1]],
-                "model":       "ARIMA (5,1,0)",
-                "error":       None,
+                "predictions": mean_fc.tolist(),
+                "conf_int_lower": conf_int[:, 0].tolist(),
+                "conf_int_upper": conf_int[:, 1].tolist(),
+                "aic": round(float(fitted.aic), 2),
             }
+        except ModelUnavailableError:
+            raise
         except Exception as e:
-            print(f"   [ARIMA]      ERROR: {e}")
-            return {"predictions":[], "aic":None,
-                    "conf_int_lower":[], "conf_int_upper":[],
-                    "model":"ARIMA (5,1,0)", "error":str(e)}
+            logger.warning("[%s] ARIMAModel failed: %s", self.symbol, e)
+            raise ModelUnavailableError(str(e))
 
 
-# =============================================================================
-#  MODEL 3 — LSTM
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────
+# LSTM — INFERENCE ONLY
+# ─────────────────────────────────────────────────────────────────────────
 class LSTMModel:
     """
-    TensorFlow/Keras LSTM:
-      Input  → LSTM(64, return_sequences=True) → Dropout(0.2)
-             → LSTM(32)                         → Dropout(0.2)
-             → Dense(16, relu) → Dense(1)
-
-    Training details:
-      • 60-day sliding window
-      • MinMaxScaler normalisation
-      • 80/20 train-val split
-      • EarlyStopping(patience=5)
-      • Cached in saved_models/<SYMBOL>.keras
+    Loads a pretrained .keras model + scaler produced by train_model.py.
+    predict() NEVER trains. If the artifact is missing, it raises
+    ModelUnavailableError with a clear message so the ensemble can skip it
+    and the API can (if it's the only model requested) return:
+        {"error": "Pretrained model not found"}
     """
+    SEQUENCE_LENGTH = 60
 
-    WINDOW     = 60
-    EPOCHS     = 20
-    BATCH_SIZE = 32
+    def __init__(self, symbol):
+        self.symbol = symbol.upper()
+        self.model_path = os.path.join(SAVED_MODELS_DIR, f"{self.symbol}.keras")
+        self.scaler_path = os.path.join(SAVED_MODELS_DIR, f"{self.symbol}_scaler.pkl")
+        self.metrics_path = os.path.join(SAVED_MODELS_DIR, f"{self.symbol}_metrics.json")
 
-    def __init__(self, symbol: str = "STOCK"):
-        self.symbol   = symbol.upper()
-        self.scaler   = MinMaxScaler(feature_range=(0, 1))
-        self.model    = None
-        os.makedirs("saved_models", exist_ok=True)
+    def is_available(self):
+        return os.path.exists(self.model_path) and os.path.exists(self.scaler_path)
 
-    @property
-    def _path(self):
-        return os.path.join("saved_models", f"{self.symbol}.keras")
+    def _load(self):
+        if not self.is_available():
+            raise ModelUnavailableError("Pretrained model not found")
 
-    def _sequences(self, scaled: np.ndarray):
-        flat = scaled.flatten()
-        X, y = [], []
-        for i in range(self.WINDOW, len(flat)):
-            X.append(flat[i - self.WINDOW : i])
-            y.append(flat[i])
-        return np.array(X).reshape(-1, self.WINDOW, 1), np.array(y)
+        # Imported lazily so Flask workers that never touch the LSTM path
+        # don't pay TensorFlow's import-time memory cost.
+        import tensorflow as tf
+        import joblib
 
-    def _build(self):
-        m = Sequential([
-            Input(shape=(self.WINDOW, 1)),
-            LSTM(64, return_sequences=True),
-            Dropout(0.2),
-            LSTM(32, return_sequences=False),
-            Dropout(0.2),
-            Dense(16, activation="relu"),
-            Dense(1),
-        ])
-        m.compile(optimizer="adam", loss="mean_squared_error")
-        return m
+        model = tf.keras.models.load_model(self.model_path, compile=False)
+        scaler = joblib.load(self.scaler_path)
+        return model, scaler
 
-    def predict(self, close_prices: list, future_days: int = 7) -> dict:
+    def _load_metrics(self):
+        if os.path.exists(self.metrics_path):
+            try:
+                with open(self.metrics_path) as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def predict(self, close_prices, future_days=7):
         try:
-            prices = np.array(close_prices, dtype=float).reshape(-1, 1)
-            if len(prices) < self.WINDOW + 10:
-                raise ValueError(f"Need ≥ {self.WINDOW+10} data points.")
+            model, scaler = self._load()
 
-            scaled = self.scaler.fit_transform(prices)
-
-            # Load or train
-            if os.path.exists(self._path):
-                print(f"   [LSTM]       Loading cached model for {self.symbol} …")
-                self.model = tf.keras.models.load_model(self._path)
-            else:
-                print(f"   [LSTM]       Training {self.symbol} (~30 sec) …")
-                X, y = self._sequences(scaled)
-                split = int(len(X) * 0.8)
-                self.model = self._build()
-                self.model.fit(
-                    X[:split], y[:split],
-                    epochs=self.EPOCHS, batch_size=self.BATCH_SIZE,
-                    validation_data=(X[split:], y[split:]),
-                    callbacks=[EarlyStopping(monitor="val_loss",
-                                             patience=5, restore_best_weights=True)],
-                    verbose=1,
+            prices = np.asarray(close_prices, dtype=float).reshape(-1, 1)
+            if len(prices) < self.SEQUENCE_LENGTH:
+                raise ModelUnavailableError(
+                    f"Need at least {self.SEQUENCE_LENGTH} data points, got {len(prices)}"
                 )
-                self.model.save(self._path)
-                print(f"   [LSTM]       Saved → {self._path}")
 
-            # Test-set RMSE
-            X_all, y_all = self._sequences(scaled)
-            split  = int(len(X_all) * 0.8)
-            y_pred = self.model.predict(X_all[split:], verbose=0).flatten()
-            y_true = self.scaler.inverse_transform(y_all[split:].reshape(-1,1)).ravel()
-            y_pred_inv = self.scaler.inverse_transform(y_pred.reshape(-1,1)).ravel()
-            rmse = float(np.sqrt(mean_squared_error(y_true, y_pred_inv)))
-            mae  = float(mean_absolute_error(y_true, y_pred_inv))
+            scaled = scaler.transform(prices)
+            window = scaled[-self.SEQUENCE_LENGTH:].reshape(1, self.SEQUENCE_LENGTH, 1)
 
-            # Autoregressive forecast
-            seed   = scaled[-self.WINDOW:].flatten().tolist()
-            future = []
+            preds_scaled = []
+            current_window = window.copy()
             for _ in range(future_days):
-                inp = np.array(seed[-self.WINDOW:]).reshape(1, self.WINDOW, 1)
-                nxt = float(self.model.predict(inp, verbose=0)[0][0])
-                future.append(nxt)
-                seed.append(nxt)
+                next_scaled = float(model.predict(current_window, verbose=0)[0][0])
+                preds_scaled.append(next_scaled)
+                current_window = np.append(
+                    current_window[:, 1:, :], [[[next_scaled]]], axis=1
+                )
 
-            preds = self.scaler.inverse_transform(
-                np.array(future).reshape(-1, 1)
+            preds = scaler.inverse_transform(
+                np.array(preds_scaled).reshape(-1, 1)
             ).flatten()
-            last  = float(close_prices[-1])
-            preds = np.clip(preds, last * 0.5, last * 2.0)
 
-            print(f"   [LSTM]       Day-7 → ${preds[-1]:.2f}  RMSE={rmse:.4f}")
+            metrics = self._load_metrics()
+
             return {
-                "predictions": [round(float(p),2) for p in preds],
-                "rmse":        round(rmse, 4),
-                "mae":         round(mae, 4),
-                "model":       "LSTM",
-                "error":       None,
+                "predictions": preds.tolist(),
+                "rmse": metrics.get("rmse"),
+                "mae": metrics.get("mae"),
             }
+        except ModelUnavailableError:
+            raise
         except Exception as e:
-            print(f"   [LSTM]       ERROR: {e}")
-            return {"predictions":[], "rmse":None, "mae":None,
-                    "model":"LSTM", "error":str(e)}
+            logger.error("[%s] LSTMModel inference failed: %s", self.symbol, e)
+            raise ModelUnavailableError(str(e))
 
 
-# =============================================================================
-#  ENSEMBLE — weighted average (LSTM 50% · ARIMA 30% · LinReg 20%)
-# =============================================================================
+# ─────────────────────────────────────────────────────────────────────────
+# Ensemble — degrades gracefully
+# ─────────────────────────────────────────────────────────────────────────
 class EnsembleModel:
     """
-    Runs all three models and combines via weighted average.
-
-    Weights (configurable):
-        LSTM            50%
-        ARIMA           30%
-        Linear Regression 20%
+    Runs Linear Regression, ARIMA, and LSTM independently. Any single
+    failure (including a missing pretrained LSTM) is caught and the
+    remaining models' predictions are reweighted and combined -- the
+    request never 500s just because one model isn't ready.
     """
+    BASE_WEIGHTS = {"linear_reg": 0.2, "arima": 0.3, "lstm": 0.5}
 
-    WEIGHTS = {"lstm": 0.50, "arima": 0.30, "linear_reg": 0.20}
+    def predict(self, symbol, prices, future_days=7):
+        results = {}
+        errors = {}
 
-    def predict(self, symbol: str, close_prices: list, future_days: int = 7) -> dict:
-        print(f"\n{'═'*52}")
-        print(f"  EnsembleModel → {symbol}  ({len(close_prices)} bars)")
-        print(f"{'═'*52}")
+        for name, cls in (
+            ("linear_reg", LinearRegModel),
+            ("arima", ARIMAModel),
+            ("lstm", LSTMModel),
+        ):
+            try:
+                results[name] = cls(symbol).predict(prices, future_days)
+            except ModelUnavailableError as e:
+                logger.info("[%s] %s unavailable: %s", symbol, name, e)
+                errors[name] = str(e)
+            except Exception as e:  # belt-and-braces: never let one model kill the request
+                logger.error("[%s] %s unexpected error: %s", symbol, name, e)
+                errors[name] = str(e)
 
-        last = float(close_prices[-1])
+        if not results:
+            raise ModelUnavailableError(
+                "All models failed - unable to produce a prediction for this symbol"
+            )
 
-        print("\n  [1/3] Linear Regression")
-        lr = LinearRegressionModel().predict(close_prices, future_days)
+        survivors = list(results.keys())
+        weight_sum = sum(self.BASE_WEIGHTS[m] for m in survivors)
+        norm_weights = {m: self.BASE_WEIGHTS[m] / weight_sum for m in survivors}
 
-        print("\n  [2/3] ARIMA")
-        ar = ARIMAModel().predict(close_prices, future_days)
+        ensemble = np.zeros(future_days)
+        for name in survivors:
+            preds = np.asarray(results[name]["predictions"][:future_days], dtype=float)
+            if len(preds) < future_days:
+                preds = np.pad(preds, (0, future_days - len(preds)), mode="edge")
+            ensemble += norm_weights[name] * preds
 
-        print("\n  [3/3] LSTM")
-        ls = LSTMModel(symbol).predict(close_prices, future_days)
-
-        # Weighted ensemble
-        results = {"linear_reg": lr, "arima": ar, "lstm": ls}
-        valid   = {k: v for k, v in results.items() if not v["error"]
-                   and len(v["predictions"]) == future_days}
-
-        if valid:
-            total_w  = sum(self.WEIGHTS[k] for k in valid)
-            ensemble = []
-            for i in range(future_days):
-                val = sum(self.WEIGHTS[k] * valid[k]["predictions"][i]
-                          for k in valid) / total_w
-                ensemble.append(round(val, 2))
-        else:
-            ensemble = []
-
-        # Trend
-        trend = ("up" if ensemble and ensemble[-1] > last else "down") if ensemble else "neutral"
-
-        # Confidence score (0–95)
-        agree = sum(
-            1 for r in results.values()
-            if not r["error"] and r["predictions"]
-            and (r["predictions"][-1] > last) == (trend == "up")
-        )
-        move  = abs((ensemble[-1] - last) / last * 100) if ensemble else 0
-        conf  = round(min(40 + agree * 15 + min(move, 10) * 1.5, 95), 1)
-
-        print(f"\n  Ensemble  → {ensemble}")
-        print(f"  Trend={trend.upper()}  Confidence={conf}%")
-        print(f"{'═'*52}\n")
+        # Confidence reflects both model agreement (not modeled here in detail)
+        # and how much of the full ensemble weight is actually backed by real models.
+        confidence = round(weight_sum / sum(self.BASE_WEIGHTS.values()) * 100, 1)
 
         return {
-            "linear_reg": lr,
-            "arima":      ar,
-            "lstm":       ls,
-            "ensemble":   ensemble,
-            "trend":      trend,
-            "confidence": conf,
-            "last_close": last,
+            "linear_reg": results.get("linear_reg"),
+            "arima": results.get("arima"),
+            "lstm": results.get("lstm"),
+            "ensemble": ensemble.tolist(),
+            "confidence": confidence,
+            "models_used": survivors,
+            "models_failed": errors,
         }
-
-
-# =============================================================================
-#  STANDALONE TEST
-# =============================================================================
-if __name__ == "__main__":
-    np.random.seed(42)
-    prices = [150.0]
-    for _ in range(399):
-        prices.append(round(prices[-1] * (1 + np.random.normal(0.0003, 0.013)), 2))
-
-    result = EnsembleModel().predict("TEST", prices, 7)
-
-    print("\n─── RESULTS ───────────────────────────────────────")
-    for k in ("linear_reg", "arima", "lstm"):
-        m = result[k]
-        print(f"{m['model']:22s}: {m['predictions']}  RMSE={m['rmse']}")
-    print(f"{'Ensemble':22s}: {result['ensemble']}")
-    print(f"Trend={result['trend'].upper()}  Confidence={result['confidence']}%")
