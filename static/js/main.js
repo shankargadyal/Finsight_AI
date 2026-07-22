@@ -50,6 +50,23 @@ function showLoading(msg, step) {
 function hideLoading()  { $('loadingBar').classList.remove('show'); }
 function showError(msg) { $('errorBar').classList.add('show'); $('errorMsg').textContent = msg; }
 function hideError()    { $('errorBar').classList.remove('show'); }
+function showDataWarning(msg) {
+  let el = $('dataWarningBar');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'dataWarningBar';
+    el.style.cssText = 'background:#4a3b0a;color:#ffd166;border:1px solid #ffd166;' +
+      'padding:10px 16px;border-radius:8px;margin:12px 0;font-size:14px;';
+    const anchor = $('tickerHeader') || document.body;
+    anchor.parentNode.insertBefore(el, anchor);
+  }
+  el.textContent = '⚠️ ' + msg;
+  el.style.display = 'block';
+}
+function hideDataWarning() {
+  const el = $('dataWarningBar');
+  if (el) el.style.display = 'none';
+}
 function setBusy(b)     { $('analyseBtn').disabled = b; $('btnSpinner').style.display = b ? 'inline-block' : 'none'; }
 function showSection(id){ $(id).classList.add('show'); }
 function hideSection(id){ $(id).classList.remove('show'); }
@@ -226,6 +243,12 @@ async function runAnalysis() {
     currentData = data;
     allPriceData = data.historical;
     hideLoading();
+
+    if (data.data_source === 'simulated' && data.warning) {
+      showDataWarning(data.warning);
+    } else {
+      hideDataWarning();
+    }
 
     renderTickerHeader(data);
     renderMainChart(data, period);
