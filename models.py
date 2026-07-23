@@ -82,7 +82,7 @@ class ARIMAModel:
             if len(prices) < 30:
                 raise ModelUnavailableError("Not enough data points for ARIMA")
 
-            model = ARIMA(prices, order=(5, 1, 0))
+            model = ARIMA(prices, order=(1, 1, 1))
             fitted = model.fit()
 
             forecast = fitted.get_forecast(steps=future_days)
