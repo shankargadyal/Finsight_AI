@@ -12,6 +12,7 @@ from datetime import datetime
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+from net_timeout import call_with_timeout, NetworkTimeoutError
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
@@ -79,8 +80,12 @@ def _summarise_with_gemini(symbol, headlines, score, label,
 Sentiment data: overall score={score:.3f}, label={label},
 positive={pos_pct:.0f}%, negative={neg_pct:.0f}%, articles={art_count}"""
 
-        # Request structured JSON matching our Pydantic schema
-        response = client.models.generate_content(
+        # Request structured JSON matching our Pydantic schema.
+        # Wrapped with a hard 8s timeout — a stalled Gemini socket must not be
+        # allowed to hang past gunicorn's worker timeout and take the process down.
+        response = call_with_timeout(
+            client.models.generate_content,
+            timeout=8,
             model='gemini-flash-latest',
             contents=prompt,
             config=types.GenerateContentConfig(
