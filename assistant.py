@@ -9,6 +9,7 @@ import os, re, json
 from datetime import datetime
 from google import genai
 from google.genai import types
+from net_timeout import call_with_timeout, NetworkTimeoutError
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
@@ -108,8 +109,12 @@ def _chat_gemini(messages: list[dict], system: str) -> str:
             temperature=0.3, # Keeps financial analysis grounded and deterministic
         )
 
-        # Call Gemini 2.5 Flash for rapid, accurate chatbot responses
-        response = client.models.generate_content(
+        # Call Gemini 2.5 Flash for rapid, accurate chatbot responses.
+        # Hard 8s timeout — see net_timeout.py for why this matters: the SDK's
+        # own timeout can't be relied on to stop a stalled socket.
+        response = call_with_timeout(
+            client.models.generate_content,
+            timeout=8,
             model='gemini-flash-latest',
             contents=gemini_contents,
             config=config,
