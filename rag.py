@@ -24,6 +24,7 @@ import logging
 import numpy as np
 from google import genai
 from google.genai import types
+from net_timeout import call_with_timeout, NetworkTimeoutError
 
 logger = logging.getLogger("finsight.rag")
 if not logger.handlers:
@@ -99,7 +100,9 @@ def reload_index():
 # Retrieval
 # ─────────────────────────────────────────────────────────────────────────
 def _embed_query(client, query: str) -> np.ndarray:
-    resp = client.models.embed_content(model=EMBED_MODEL, contents=query)
+    resp = call_with_timeout(
+        client.models.embed_content, timeout=8, model=EMBED_MODEL, contents=query
+    )
     return np.array(resp.embeddings[0].values, dtype=float)
 
 
@@ -168,7 +171,9 @@ def answer(query: str, top_k: int = TOP_K) -> dict:
             max_output_tokens=500,
             temperature=0.2,
         )
-        response = client.models.generate_content(
+        response = call_with_timeout(
+            client.models.generate_content,
+            timeout=10,
             model=GEN_MODEL,
             contents=[types.Content(role="user", parts=[types.Part.from_text(text=user_prompt)])],
             config=config,
