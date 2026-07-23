@@ -236,12 +236,18 @@ class EnsembleModel:
         # and how much of the full ensemble weight is actually backed by real models.
         confidence = round(weight_sum / sum(self.BASE_WEIGHTS.values()) * 100, 1)
 
+        # Trend: does the ensemble's 7-day-out forecast sit above or below the
+        # most recent actual close? app.py's _make_recommendation() reads this.
+        last_actual = float(np.asarray(prices, dtype=float)[-1])
+        trend = "up" if ensemble[-1] > last_actual else "down" if ensemble[-1] < last_actual else "flat"
+
         return {
             "linear_reg": results.get("linear_reg"),
             "arima": results.get("arima"),
             "lstm": results.get("lstm"),
             "ensemble": ensemble.tolist(),
             "confidence": confidence,
+            "trend": trend,
             "models_used": survivors,
             "models_failed": errors,
         }
