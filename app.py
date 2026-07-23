@@ -205,29 +205,29 @@ def analyze(ticker: str):
         rec   = _make_recommendation(trend, sent["overall_label"], conf)
 
         # ── 7. Confidence range ────────────────────────────────────────────────
-       # ── 7. Confidence range ────────────────────────────────────────────────
-models = [
-    result.get("linear_reg"),
-    result.get("lstm"),
-]
+        models = [
+            result.get("linear_reg"),
+            result.get("lstm"),
+        ]
 
-rmse_values = [
-    m.get("rmse", 0)
-    for m in models
-    if m is not None
-]
+        rmse_values = [
+            m.get("rmse", 0)
+            for m in models
+            if m is not None
+        ]
 
-avg_rmse = (
-    sum(rmse_values) / len(rmse_values)
-    if rmse_values
-    else 0
-)
+        avg_rmse = (
+            sum(rmse_values) / len(rmse_values)
+            if rmse_values
+            else 0
+        )
 
-price_range = _confidence_range(
-    last_close,
-    result.get("ensemble", []),
-    avg_rmse,
-)
+        price_range = _confidence_range(
+            last_close,
+            result.get("ensemble", []),
+            avg_rmse,
+        )
+
         # ── 8. Historical chart (last 90 days) ─────────────────────────────────
         hist = [
             {
