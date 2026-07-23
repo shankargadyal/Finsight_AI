@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FinSight AI — Roadmap</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/future.css') }}"/>
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('fsTheme') || 'light');</script>
+</head>
+<body class="future-page">
+
+<div class="future-container">
+
+  <!-- HEADER -->
+  <header class="future-header">
+    <a href="/" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      Back to Dashboard
+    </a>
+    <div class="future-hero">
+      <div class="future-eyebrow">PRODUCT ROADMAP</div>
+      <h1 class="future-headline">The Future of<br/><span class="future-accent">FinSight AI</span></h1>
+      <p class="future-sub">
+        From individual stock forecasting to a full-scale intelligent investment platform —
+        here's where we're headed.
+      </p>
+      <div class="future-version-pills">
+        <div class="ver-pill ver-current">v2.0 — Current</div>
+        <div class="ver-pill ver-next">v3.0 — Minor Project</div>
+        <div class="ver-pill ver-future">v4.0 — Major Project</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- TIMELINE -->
+  <section class="timeline-section">
+    <div class="timeline-label">DEVELOPMENT PHASES</div>
+    <div class="timeline-track">
+      <div class="tl-phase tl-done">
+        <div class="tl-dot tl-dot-done"></div>
+        <div class="tl-text">v1.0<br/>Core ML</div>
+      </div>
+      <div class="tl-line tl-line-done"></div>
+      <div class="tl-phase tl-done">
+        <div class="tl-dot tl-dot-done"></div>
+        <div class="tl-text">v2.0<br/>Auth + Risk</div>
+      </div>
+      <div class="tl-line"></div>
+      <div class="tl-phase tl-next">
+        <div class="tl-dot tl-dot-next"></div>
+        <div class="tl-text">v3.0<br/>RAG + Cloud</div>
+      </div>
+      <div class="tl-line"></div>
+      <div class="tl-phase">
+        <div class="tl-dot"></div>
+        <div class="tl-text">v4.0<br/>SaaS Platform</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROADMAP GRID -->
+  <section class="roadmap-grid">
+
+    <div class="roadmap-card roadmap-v3 fade-up" style="animation-delay:.05s">
+      <div class="roadmap-phase-tag">v3.0 · Minor Project</div>
+      <div class="roadmap-icon">🧠</div>
+      <h3 class="roadmap-title">RAG-Based Financial Assistant</h3>
+      <p class="roadmap-desc">
+        Retrieval-Augmented Generation using a vector database of SEC filings, earnings transcripts,
+        and financial reports. Ask complex questions about a company and get evidence-backed answers
+        grounded in real documents.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">LangChain</span>
+        <span class="rtag">Pinecone</span>
+        <span class="rtag">SEC EDGAR</span>
+        <span class="rtag">RAG</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card roadmap-v3 fade-up" style="animation-delay:.1s">
+      <div class="roadmap-phase-tag">v3.0 · Minor Project</div>
+      <div class="roadmap-icon">🔐</div>
+      <h3 class="roadmap-title">Cloud Deployment + JWT Auth</h3>
+      <p class="roadmap-desc">
+        Deploy to AWS / GCP with a production-grade JWT authentication system,
+        rate limiting, and a Redis-backed token store. Full CI/CD pipeline
+        via GitHub Actions for zero-downtime deployments.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">AWS EC2</span>
+        <span class="rtag">JWT</span>
+        <span class="rtag">Redis</span>
+        <span class="rtag">Docker</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card roadmap-v3 fade-up" style="animation-delay:.15s">
+      <div class="roadmap-phase-tag">v3.0 · Minor Project</div>
+      <div class="roadmap-icon">⚡</div>
+      <h3 class="roadmap-title">SHAP-Based Explainability</h3>
+      <p class="roadmap-desc">
+        Integrate SHAP (SHapley Additive exPlanations) to show exactly which features
+        — volume spikes, RSI levels, sentiment shifts — contributed most to each
+        prediction, making the model genuinely interpretable.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">SHAP</span>
+        <span class="rtag">XAI</span>
+        <span class="rtag">Feature Importance</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card roadmap-v4 fade-up" style="animation-delay:.2s">
+      <div class="roadmap-phase-tag">v4.0 · Major Project</div>
+      <div class="roadmap-icon">🤖</div>
+      <h3 class="roadmap-title">Transformer-Based Forecasting</h3>
+      <p class="roadmap-desc">
+        Replace LSTM with a fine-tuned Temporal Fusion Transformer (TFT) or
+        PatchTST model trained on multi-stock datasets. Attention heads reveal
+        which historical windows drive each prediction.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">TFT</span>
+        <span class="rtag">PatchTST</span>
+        <span class="rtag">HuggingFace</span>
+        <span class="rtag">Fine-tuning</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card roadmap-v4 fade-up" style="animation-delay:.25s">
+      <div class="roadmap-phase-tag">v4.0 · Major Project</div>
+      <div class="roadmap-icon">📡</div>
+      <h3 class="roadmap-title">Real-Time Market Streaming</h3>
+      <p class="roadmap-desc">
+        WebSocket-based live price feeds with sub-second updates, streaming
+        technical indicator recalculation, and live alert triggers when
+        RSI, MACD, or price targets are hit.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">WebSocket</span>
+        <span class="rtag">Kafka</span>
+        <span class="rtag">Alpaca API</span>
+        <span class="rtag">Real-Time</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card roadmap-v4 fade-up" style="animation-delay:.3s">
+      <div class="roadmap-phase-tag">v4.0 · Major Project</div>
+      <div class="roadmap-icon">📊</div>
+      <h3 class="roadmap-title">Portfolio Optimisation Engine</h3>
+      <p class="roadmap-desc">
+        Modern Portfolio Theory implementation using Markowitz mean-variance
+        optimisation and Black-Litterman model. Input your holdings, get
+        an efficient frontier chart and optimal rebalancing recommendations.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">MPT</span>
+        <span class="rtag">Scipy</span>
+        <span class="rtag">Efficient Frontier</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card roadmap-future fade-up" style="animation-delay:.35s">
+      <div class="roadmap-phase-tag">Future Vision</div>
+      <div class="roadmap-icon">🎮</div>
+      <h3 class="roadmap-title">Reinforcement Learning Trading Agent</h3>
+      <p class="roadmap-desc">
+        A DQN / PPO agent trained in a simulated market environment to learn
+        optimal buy/sell/hold policies. Paper-trading backtesting across 10 years
+        of historical data before any live deployment.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">RL</span>
+        <span class="rtag">PPO</span>
+        <span class="rtag">Gymnasium</span>
+        <span class="rtag">Backtest</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card roadmap-future fade-up" style="animation-delay:.4s">
+      <div class="roadmap-phase-tag">Future Vision</div>
+      <div class="roadmap-icon">🎙️</div>
+      <h3 class="roadmap-title">Voice-Based Financial Assistant</h3>
+      <p class="roadmap-desc">
+        "Hey FinSight, how is Apple performing?" — voice-activated analysis
+        using Whisper STT and a TTS engine for natural spoken responses,
+        accessible via a mobile PWA.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">Whisper</span>
+        <span class="rtag">TTS</span>
+        <span class="rtag">PWA</span>
+        <span class="rtag">Mobile</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card roadmap-future fade-up" style="animation-delay:.45s">
+      <div class="roadmap-phase-tag">Future Vision</div>
+      <div class="roadmap-icon">🌍</div>
+      <h3 class="roadmap-title">Multi-Market Global Coverage</h3>
+      <p class="roadmap-desc">
+        Expand beyond US equities to global stocks (NSE, LSE, TSE), 
+        crypto (BTC, ETH, SOL), forex pairs, commodities, and ETFs — 
+        all in a unified interface with currency normalisation.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">NSE</span>
+        <span class="rtag">Forex</span>
+        <span class="rtag">Crypto</span>
+        <span class="rtag">Multi-Currency</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card roadmap-future fade-up" style="animation-delay:.5s">
+      <div class="roadmap-phase-tag">Future Vision</div>
+      <div class="roadmap-icon">💳</div>
+      <h3 class="roadmap-title">SaaS Platform with Billing</h3>
+      <p class="roadmap-desc">
+        Full SaaS product with Stripe subscription billing — Free / Pro / Institutional tiers.
+        Pro users get unlimited analyses, API access, PDF reports, and priority LSTM training.
+      </p>
+      <div class="roadmap-tags">
+        <span class="rtag">Stripe</span>
+        <span class="rtag">SaaS</span>
+        <span class="rtag">API Keys</span>
+        <span class="rtag">Tiers</span>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- CURRENT CAPABILITIES -->
+  <section class="current-section">
+    <div class="current-label">WHAT'S IN V2.0 RIGHT NOW</div>
+    <div class="current-grid">
+      <div class="cur-item"><span class="cur-check">✓</span>Linear Regression + ARIMA + LSTM</div>
+      <div class="cur-item"><span class="cur-check">✓</span>Ensemble Forecasting (weighted avg)</div>
+      <div class="cur-item"><span class="cur-check">✓</span>VADER Sentiment Analysis</div>
+      <div class="cur-item"><span class="cur-check">✓</span>AI News Summarizer</div>
+      <div class="cur-item"><span class="cur-check">✓</span>User Auth (Register / Login)</div>
+      <div class="cur-item"><span class="cur-check">✓</span>Watchlist & Search History</div>
+      <div class="cur-item"><span class="cur-check">✓</span>Risk Analyzer Engine</div>
+      <div class="cur-item"><span class="cur-check">✓</span>Prediction Confidence Meter</div>
+      <div class="cur-item"><span class="cur-check">✓</span>AI Financial Chat Assistant</div>
+      <div class="cur-item"><span class="cur-check">✓</span>User Dashboard & Predictions History</div>
+      <div class="cur-item"><span class="cur-check">✓</span>Technical Indicators (RSI, MACD, BB)</div>
+      <div class="cur-item"><span class="cur-check">✓</span>Buy / Hold / Sell Recommendation</div>
+    </div>
+  </section>
+
+  <footer style="text-align:center;padding:2rem 0;color:var(--muted);font-family:var(--fm);font-size:.7rem">
+    FinSight AI v2 &nbsp;·&nbsp; Built for MSc Data Science Portfolio &nbsp;·&nbsp;
+    <a href="/" style="color:var(--cyan);text-decoration:none">← Back to Dashboard</a>
+  </footer>
+
+</div>
+
+<script>
+  document.querySelectorAll('.fade-up').forEach((el, i) => {
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) { el.style.animationPlayState = 'running'; obs.unobserve(el); } });
+    }, { threshold: 0.1 });
+    el.style.animationPlayState = 'paused';
+    obs.observe(el);
+  });
+</script>
+</body>
+</html>
