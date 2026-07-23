@@ -279,6 +279,36 @@ def analyze(ticker: str):
         return jsonify({"error": "Something went wrong processing this request."}), 500
 
 
+@app.route("/api/explain/<ticker>")
+@optional_auth
+def explain(ticker: str):
+    """
+    Lightweight, exact linear-SHAP explanation of a small technical-indicator
+    model (SMA/EMA/RSI/MACD/Bollinger → next-day return). Computed on demand,
+    not as part of /api/analyze, since it's only needed when a user opens the
+    explainability panel.
+    """
+    symbol = ticker.upper().strip()
+    try:
+        from explainability import explain_next_day_return, ExplainabilityUnavailableError
+
+        df = fetch_ohlcv(symbol, period="1y")
+        if df.empty:
+            return jsonify({"error": f"No data found for '{symbol}'."}), 404
+        is_simulated = bool(df.attrs.get("simulated", False))
+        df = add_technical_indicators(df)
+
+        result = explain_next_day_return(df)
+        result["symbol"] = symbol
+        result["data_source"] = "simulated" if is_simulated else "live"
+        return jsonify(result)
+    except ExplainabilityUnavailableError as e:
+        return jsonify({"error": str(e)}), 422
+    except Exception:
+        traceback.print_exc()
+        return jsonify({"error": "Something went wrong processing this request."}), 500
+
+
 # =============================================================================
 #  API — CHAT ASSISTANT
 # =============================================================================
@@ -300,14 +330,16 @@ def chat_endpoint():
     history = get_chat_history(session_id, limit=20)
     history.append({"role": "user", "content": user_msg})
 
-    # Get reply
-    reply = assistant_chat(history, context)
+    # Get reply (grounded with lightweight RAG retrieval)
+    result = assistant_chat(history, context)
+    reply   = result["reply"]
+    sources = result.get("sources", [])
 
     # Persist
     save_chat_message(uid, session_id, "user", user_msg)
     save_chat_message(uid, session_id, "assistant", reply)
 
-    return jsonify({"reply": reply, "session_id": session_id})
+    return jsonify({"reply": reply, "session_id": session_id, "sources": sources})
 
 
 @app.route("/api/chat/history")
