@@ -1,0 +1,30 @@
+TITLE: General Investing Glossary
+
+Diversification: spreading investments across multiple assets, sectors, or
+asset classes so that a poor outcome in any single holding has a limited
+effect on the overall portfolio. Diversification reduces unsystematic
+(company-specific) risk but does not eliminate systematic (market-wide)
+risk.
+
+Sharpe Ratio: a measure of risk-adjusted return, calculated as the excess
+return of an investment over a risk-free rate, divided by the investment's
+volatility (standard deviation of returns). A higher Sharpe Ratio indicates
+more return earned per unit of risk taken.
+
+Efficient Frontier: in Modern Portfolio Theory, the set of portfolios that
+offer the highest expected return for a given level of risk (or the lowest
+risk for a given expected return). Portfolios below the frontier are
+considered sub-optimal, since a different mix could achieve the same return
+with less risk.
+
+Modern Portfolio Theory (MPT): a framework, developed by Harry Markowitz,
+for constructing a portfolio that maximizes expected return for a given
+level of risk by considering not just individual asset risk, but how assets
+move in relation to each other (correlation).
+
+Dollar-Cost Averaging: investing a fixed amount of money at regular
+intervals regardless of price, which reduces the impact of short-term price
+volatility on the average purchase price over time.
+
+None of these concepts guarantee investment outcomes. They are frameworks
+for reasoning about risk and return, not predictions.

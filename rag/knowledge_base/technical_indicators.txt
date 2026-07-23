@@ -1,0 +1,36 @@
+TITLE: Understanding Technical Indicators
+
+Simple Moving Average (SMA) is the average closing price over a fixed window,
+such as 20 or 50 days. It smooths out short-term noise to show the underlying
+trend. When price trades above its SMA, the trend is generally considered
+bullish for that timeframe; when below, bearish.
+
+Exponential Moving Average (EMA) is similar to SMA but weights recent prices
+more heavily, so it reacts faster to new information. EMA12 and EMA26 are
+common short and medium-term trend measures.
+
+Relative Strength Index (RSI) measures the speed and size of recent price
+changes on a 0-100 scale. Traditionally, RSI above 70 is considered
+"overbought" (the asset may be due for a pullback), and RSI below 30 is
+considered "oversold" (the asset may be due for a bounce). RSI near 50
+suggests no strong momentum in either direction. RSI is a momentum signal,
+not a guarantee of reversal — assets can stay overbought or oversold for
+extended periods during strong trends.
+
+MACD (Moving Average Convergence Divergence) is the difference between the
+12-day and 26-day EMA. A 9-day EMA of MACD itself is called the "signal
+line." When MACD crosses above its signal line, it is often read as bullish
+momentum building; crossing below is often read as bearish momentum
+building. The MACD histogram (MACD minus signal line) shows the size of
+that gap.
+
+Bollinger Bands plot a moving average with bands two standard deviations
+above and below it. Price near the upper band suggests the asset is trading
+at the high end of its recent volatility range; price near the lower band
+suggests the low end. Bands widen during high volatility and narrow during
+low volatility ("squeeze"), which some traders watch as a signal that a
+larger move may be coming.
+
+None of these indicators predict the future with certainty. They describe
+what has already happened in price and volume data, and are best used
+together rather than in isolation.
