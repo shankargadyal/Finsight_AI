@@ -81,7 +81,7 @@ positive={pos_pct:.0f}%, negative={neg_pct:.0f}%, articles={art_count}"""
 
         # Request structured JSON matching our Pydantic schema
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-flash-latest',
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction="You are an expert financial market summarizer. Analyze data objectively.",
