@@ -26,32 +26,48 @@ Your capabilities:
 Tone: Professional but approachable. Use data when available.
 Always include a disclaimer that this is educational, not financial advice.
 Keep responses under 200 words unless the question demands more depth.
-Format key points as short bullet points when helpful."""
+Format key points as short bullet points when helpful.
+If retrieved reference material is provided below, use it to ground your
+answer and prefer it over general knowledge when it's relevant to the
+question. Do not present retrieved material as more authoritative than it
+is, and don't force it into an answer where it doesn't actually apply."""
 
 
 # =============================================================================
 #  Main entry point
 # =============================================================================
 
-def chat(messages: list[dict], context: dict | None = None) -> str:
+def chat(messages: list[dict], context: dict | None = None) -> dict:
     """
-    Send a conversation to the AI assistant.
-
-    Parameters
-    ----------
-    messages : list of {"role": "user"|"assistant", "content": str}
-    context  : optional dict with current ticker data to inject into system prompt
+    Send a conversation to the AI assistant, grounded with retrieved
+    knowledge-base context (lightweight TF-IDF RAG — see rag/retriever.py).
 
     Returns
     -------
-    str — assistant reply
+    dict — {"reply": str, "sources": [{"source": str, "score": float}, ...]}
     """
+    user_query = messages[-1]["content"] if messages else ""
+
+    try:
+        from rag.retriever import retrieve
+        retrieved = retrieve(user_query, top_k=3)
+    except Exception as e:
+        print(f"[assistant] RAG retrieval error: {e}")
+        retrieved = []
+
     enriched_system = _build_system_prompt(context)
+    if retrieved:
+        rag_block = "\n\n## Retrieved Reference Material (use if relevant to the question)\n"
+        rag_block += "\n\n".join(f"[{r['source']}]\n{r['text']}" for r in retrieved)
+        enriched_system += rag_block
 
     if GEMINI_API_KEY:
-        return _chat_gemini(messages, enriched_system)
+        reply = _chat_gemini(messages, enriched_system)
     else:
-        return _chat_rule_based(messages[-1]["content"] if messages else "", context)
+        reply = _chat_rule_based(messages[-1]["content"] if messages else "", context)
+
+    sources = [{"source": r["source"], "score": r["score"]} for r in retrieved]
+    return {"reply": reply, "sources": sources}
 
 
 # =============================================================================
