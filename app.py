@@ -30,6 +30,7 @@ from sentiment import analyse_ticker
 from risk      import calculate_risk
 from news_summarizer import summarise_news
 from assistant import chat as assistant_chat
+from rag       import answer as rag_answer, RAGUnavailableError
 from database  import (init_db, get_watchlist, add_to_watchlist, remove_from_watchlist,
                         log_search, get_recent_searches,
                         save_prediction, get_prediction_history,
@@ -279,36 +280,6 @@ def analyze(ticker: str):
         return jsonify({"error": "Something went wrong processing this request."}), 500
 
 
-@app.route("/api/explain/<ticker>")
-@optional_auth
-def explain(ticker: str):
-    """
-    Lightweight, exact linear-SHAP explanation of a small technical-indicator
-    model (SMA/EMA/RSI/MACD/Bollinger → next-day return). Computed on demand,
-    not as part of /api/analyze, since it's only needed when a user opens the
-    explainability panel.
-    """
-    symbol = ticker.upper().strip()
-    try:
-        from explainability import explain_next_day_return, ExplainabilityUnavailableError
-
-        df = fetch_ohlcv(symbol, period="1y")
-        if df.empty:
-            return jsonify({"error": f"No data found for '{symbol}'."}), 404
-        is_simulated = bool(df.attrs.get("simulated", False))
-        df = add_technical_indicators(df)
-
-        result = explain_next_day_return(df)
-        result["symbol"] = symbol
-        result["data_source"] = "simulated" if is_simulated else "live"
-        return jsonify(result)
-    except ExplainabilityUnavailableError as e:
-        return jsonify({"error": str(e)}), 422
-    except Exception:
-        traceback.print_exc()
-        return jsonify({"error": "Something went wrong processing this request."}), 500
-
-
 # =============================================================================
 #  API — CHAT ASSISTANT
 # =============================================================================
@@ -330,16 +301,14 @@ def chat_endpoint():
     history = get_chat_history(session_id, limit=20)
     history.append({"role": "user", "content": user_msg})
 
-    # Get reply (grounded with lightweight RAG retrieval)
-    result = assistant_chat(history, context)
-    reply   = result["reply"]
-    sources = result.get("sources", [])
+    # Get reply
+    reply = assistant_chat(history, context)
 
     # Persist
     save_chat_message(uid, session_id, "user", user_msg)
     save_chat_message(uid, session_id, "assistant", reply)
 
-    return jsonify({"reply": reply, "session_id": session_id, "sources": sources})
+    return jsonify({"reply": reply, "session_id": session_id})
 
 
 @app.route("/api/chat/history")
@@ -348,6 +317,30 @@ def chat_history_endpoint():
     session_id = request.args.get("session_id", "anon")
     history    = get_chat_history(session_id)
     return jsonify({"history": history})
+
+
+# =============================================================================
+#  API — RAG FINANCIAL ASSISTANT (document Q&A over SEC filings / reports)
+# =============================================================================
+
+@app.route("/api/rag", methods=["POST"])
+@optional_auth
+def rag_endpoint():
+    body  = request.get_json(silent=True) or {}
+    query = (body.get("query") or "").strip()
+    if not query:
+        return jsonify({"error": "Query required"}), 400
+
+    try:
+        result = rag_answer(query)
+        return jsonify(result)
+    except RAGUnavailableError as e:
+        # Distinct from a 500: this means "index not built" or "no relevant docs",
+        # not a crash — the frontend can show a friendly "no documents indexed yet" state.
+        return jsonify({"error": str(e)}), 503
+    except Exception:
+        traceback.print_exc()
+        return jsonify({"error": "Something went wrong processing this request."}), 500
 
 
 # =============================================================================
