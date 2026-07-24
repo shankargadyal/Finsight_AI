@@ -59,7 +59,7 @@ FinSight AI is a full-stack web application that combines Machine Learning, Time
 | Deep Learning | LSTM (via Keras) |
 | NLP / Sentiment | VADER Sentiment Analysis |
 | Data Source | Yahoo Finance API (`yfinance`), News API |
-| AI Assistant | Anthropic Claude API |
+| AI Assistant | gemini API |
 | Database | SQLite |
 | Auth | bcrypt |
 
@@ -102,7 +102,7 @@ finsight-ai/
 
 - Python 3.10+
 - pip
-- An [Anthropic API key]((https://aistudio.google.com/)) (for the AI assistant)
+- An [Gemini API key]((https://aistudio.google.com/)) (for the AI assistant)
 - A [News API key](https://newsapi.org/) (for the news summarizer)
 
 ### Installation
@@ -121,7 +121,7 @@ venv\Scripts\activate           # Windows
 pip install -r requirements.txt
 
 # 4. Set environment variables
-export ANTHROPIC_API_KEY=your_key_here
+export Gemini_API_KEY=your_key_here
 export NEWS_API_KEY=your_key_here
 
 # 5. Run the app
